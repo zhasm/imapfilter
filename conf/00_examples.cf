@@ -1,0 +1,13 @@
+header __has_subject Subject  .
+header __has_from    From  .
+header __has_msg_id  Message-ID  .
+header __has_attachment Content-Disposition (?i)filename\=.
+meta no_attachment ! __has_attachment
+meta complex_enough no_attachment && __has_from
+header cst_date Date \+0800
+meta attch_cst __has_attachment + cst_date > 2
+
+
+header from_JP from  \.jp$
+header to_dot_com to \.com
+meta from_jp_to_dot_com from_JP and to_dot_com
