@@ -8,14 +8,36 @@ header __has_attachment Content-Disposition (?i)filename\=.
 meta no_attachment ! __has_attachment
 meta complex_enough no_attachment && __has_from
 header cst_date Date \+0800
-meta attch_cst __has_attachment + cst_date > 2
+meta attch_cst (__has_attachment + cst_date) > 1
 
 header from_JP from  \.jp$
 header to_dot_com to \.com
 meta from_jp_to_dot_com from_JP and to_dot_com
 
-action from_jp_to_dot_com move dest, fwd rex@zhasm.com, cc rex@zhasm.com, rm
-
 #any alert
-header f_any_alert From \banyalert\b
+header f_any_alert from anyalert
 #action action_name rule        action dest
+header f_sophos from \@sophos\.com
+header t_sophos to \@sophos\.com
+
+meta m_sophos f_sophos or t_sophos
+
+header _sub_shift_report Subject ^Shift-Report\b
+#STBU China <stbu-toc-china@cisco.com>
+header _to_stbu To stbu-toc(?:-china)?\@cisco\.com
+meta shift_report _sub_shift_report and _to_stbu
+
+header _f_vtest From vtest@av-test.de
+
+header s_ruleid subject RuleID\d+
+header s_virus subject \[Virus\]
+meta   m_virus s_virus and s_ruleid
+meta   m_ruleid s_ruleid and _to_stbu and not s_virus
+
+header s_reminder subject ^(?i)(?:re)?Reminder:
+
+header s_sms_alert subject SMS Alert
+
+header s_obt subject OUTBREAKTEST
+
+header f_mga from alert@mga.toclab.com

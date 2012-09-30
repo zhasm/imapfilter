@@ -116,11 +116,16 @@ class Msg(object):
         'print to stdout.'
         _structure(self.msg)
 
+    def has_image(self, msg=None):
+        ret = str(self.get_content_type())
+        return ret.count('image/')
+
 
 if __name__ == '__main__':
     import sys
     for i in sys.argv[1:]:
+        print i
         msg = Msg(file=i)
-        print 'sub, charset,:', msg.get_header('subject')
+        msg.get_stucture()
         print msg.get_content_type()
-        print 'bodylen', msg.get_body_len()
+        print 'any images?', msg.has_image(), msg.get_content_type()

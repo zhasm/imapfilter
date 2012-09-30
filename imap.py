@@ -21,13 +21,16 @@ import logging
 
 class IMAP(Thread):
     def __init__(self, filman):
-#        Thread.__init__(self)
-#       Thread.__init__(self)
         super(IMAP, self).__init__()
         self.imap = IMAPClient(HOST, use_uid=True, ssl=ssl)
         self.imap.login(USERNAME, PASSWORD)
         self.messages = []
         self.filterman = filman
+        self.counter = 0
+        self.loop()
+        exit()
+    def mark_as_unread(self, msg):
+        return self.imap.remove_flags(msgs, ('\\SEEN'))
 
     def check(self):
         server = self.imap
@@ -55,10 +58,11 @@ class IMAP(Thread):
             return
 
         response = server.fetch(self.messages, ['RFC822'])
-        msgs = ({'id': msgid, 'msg': Msg(string=data['RFC822'])}
-                for (msgid, data) in response.iteritems())
+        msgs = [(msgid, Msg(string=data['RFC822']))
+                for (msgid, data) in response.iteritems()]
 
         self.filterman.test_match_and_take_action(server, msgs)
+        exit()
 
     def run(self):
         count = 0
@@ -83,6 +87,7 @@ if __name__ == '__main__':
     parse_command_line()
 
     ruleman = RuleManager()
+    ruleman.load_cfs()
     filman = FilterManager(ruleman=ruleman)
     i = IMAP(filman=filman)
 

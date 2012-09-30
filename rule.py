@@ -74,27 +74,23 @@ class Header(RuleBase):
 
     def __init__(self, **kwargs):
         super(Header, self).__init__(**kwargs)
-        self.regex = re.compile(self.regex)
+        self.regex = re.compile(r"(?m)%s" % self.regex)
 
     def get_fields(self):
         return ['name', 'header_name', 'regex', 'rule_type']
 
     def is_match(self, msg):
         header = msg.get_header(self.header_name)
-        if header:
-            for i in header:
-                if self.regex.search(i):
-                    return True
-        return False
-
+        return True if self.regex.search(header) else False
 
 class Meta(RuleBase):
 
     def __init__(self, **kwargs):
         super(Meta, self).__init__(**kwargs)
+        self.gen = self.gen_rule('msg')
 
     def get_fields(self):
-        return ['name', 'expr', 'rule_type']
+        return ['name', 'expr', 'rule_type', 'gen']
 
     def gen_rule(self, msg):
 
@@ -104,7 +100,7 @@ class Meta(RuleBase):
         expr = regex.sub(
             r'''%(ruleman)s.get_rule("\1").is_match(%(msg)s)''', expr)
         expr = rk.unescape(expr)
-
+        self.gen = expr
         return expr
 
     def is_match(self, msg):
@@ -122,7 +118,6 @@ class RuleManager(object):
         self.type_str = 'rule_type'
         self.ext = '*.cf'
         self.white_spaces = re.compile(r'\s+')
-        self.load_cfs()
 
     def register(self, **kwargs):
         mapper = self.mapper
@@ -142,13 +137,13 @@ class RuleManager(object):
             return
 
         def _trim(line):
-            if line:
-                line = line.strip()
-                if line:
-                    if not line.startswith('#'):
-                        return line
+            if not line: return ''
+            line = line.strip()
+            if not line.startswith('#'):
+                return line
 
         lines = (_trim(i) for i in lines)
+
         for i in lines:
             if not i:
                 continue
@@ -171,7 +166,7 @@ class RuleManager(object):
         elif rule_type == 'meta':
             kw['expr'] = rule
 
-            self.register(**kw)
+        self.register(**kw)
 
     def load_cfs(self, path=None):
         from glob import glob
@@ -187,6 +182,7 @@ class RuleManager(object):
 
     def is_match(self, msg, rule_name):
         rule = self.get_rule(rule_name)
+
         if rule.rule_type == 'header':
             return rule.is_match(msg)
         else:
@@ -196,6 +192,7 @@ class RuleManager(object):
                 'msg': 'msg',
             })
             try:
+                logging.info('meta rule %s generated: %r' % (rule_name, raw))
                 return eval(raw)
             except Exception as e:
-                print raw, e
+                logging.error(e)
