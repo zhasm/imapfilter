@@ -29,7 +29,6 @@ class IMAP(Thread):
         self.messages = []
         self.filterman = filman
 
-
     def check(self):
         server = self.imap
         select_info = server.select_folder('INBOX')
@@ -56,9 +55,10 @@ class IMAP(Thread):
             return
 
         response = server.fetch(self.messages, ['RFC822'])
-        msgs = ({'id': msgid, 'msg': Msg(string=data['RFC822'])} for (msgid, data) in response.iteritems())
+        msgs = ({'id': msgid, 'msg': Msg(string=data['RFC822'])}
+                for (msgid, data) in response.iteritems())
 
-        filterman.test_match_and_take_action(server, megs)
+        self.filterman.test_match_and_take_action(server, msgs)
 
     def run(self):
         count = 0
@@ -68,11 +68,13 @@ class IMAP(Thread):
             self.idle() or self.loop()
 
             sleep(10)
-            if not count % 10: #do loop every 10 runs.
+            if not count % 10:  # do loop every 10 runs.
                 self.loop()
 
+
 def set_timezone(zone='Asia/Shanghai'):
-    import os, time
+    import os
+    import time
     os.environ['TZ'] = zone
     time.tzset()
 

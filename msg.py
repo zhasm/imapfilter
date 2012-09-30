@@ -13,7 +13,6 @@ import logging
 import re
 
 
-
 class Msg(object):
 
     def __init__(self, **kwargs):
@@ -22,7 +21,7 @@ class Msg(object):
                 or
                 'string': 'string that contains the msg'
         }'''
-        self.msg=None
+        self.msg = None
         if 'file' in kwargs:
             try:
                 f = kwargs.get('file')
@@ -82,7 +81,6 @@ class Msg(object):
 
         return ret
 
-
     def get_body(self, format=""):
         'when the body is of multipart, the `format` is applicable.'
         'format = plain, text only'
@@ -96,7 +94,7 @@ class Msg(object):
                     msg.get_payload(decode=True),
                     msg.get_content_charset(),
                     'replace'
-                    ).strip().encode('utf-8')
+                ).strip().encode('utf-8')
             else:
                 return ""
 

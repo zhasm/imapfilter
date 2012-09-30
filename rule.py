@@ -8,17 +8,18 @@
 import logging
 import re
 import json
-from msg import Msg
 
 ruleman = None
 
+
 class ReservedKeywords(object):
     def __init__(self):
-        self.rk= {
+        self.rk = {
             'and': '&&',
             'or': '||',
             'not': '!',
-            }
+        }
+
     def escape(self, p):
         'convert keyword to symbol'
         regex = re.compile(r'(?i)\b(%s)\b' % ('|'.join(self.rk.keys())))
@@ -31,6 +32,7 @@ class ReservedKeywords(object):
     def unescape(self, p):
         'convert symbol to reserved keyword'
         return p.replace('&&', ' and ').replace('||', ' or ').replace('!', ' not ').replace('  ', ' ')
+
 
 class RuleBase(object):
 
@@ -67,6 +69,7 @@ class RuleBase(object):
             ret[k] = v
         return json.dumps(ret)
 
+
 class Header(RuleBase):
 
     def __init__(self, **kwargs):
@@ -84,6 +87,7 @@ class Header(RuleBase):
                     return True
         return False
 
+
 class Meta(RuleBase):
 
     def __init__(self, **kwargs):
@@ -97,13 +101,15 @@ class Meta(RuleBase):
         rk = ReservedKeywords()
         expr = rk.escape(self.expr)
         regex = re.compile(r'\b(\w+_\w+\b)')
-        expr = regex.sub(r'''%(ruleman)s.get_rule("\1").is_match(%(msg)s)''', expr)
+        expr = regex.sub(
+            r'''%(ruleman)s.get_rule("\1").is_match(%(msg)s)''', expr)
         expr = rk.unescape(expr)
 
         return expr
 
     def is_match(self, msg):
         return self.gen_rule(msg)
+
 
 class RuleManager(object):
 
@@ -112,7 +118,7 @@ class RuleManager(object):
         self.mapper = {
             'header': Header,
             'meta': Meta,
-            }
+        }
         self.type_str = 'rule_type'
         self.ext = '*.cf'
         self.white_spaces = re.compile(r'\s+')
@@ -171,7 +177,7 @@ class RuleManager(object):
         from glob import glob
         self.rules = {}
         if not path:
-            path='./conf'
+            path = './conf'
         filenames = glob('%s/%s' % (path, self.ext))
         for fn in filenames:
             self.load_one_cf(fn)
@@ -188,7 +194,7 @@ class RuleManager(object):
             raw = template % ({
                 'ruleman': 'self',
                 'msg': 'msg',
-                })
+            })
             try:
                 return eval(raw)
             except Exception as e:
