@@ -7,8 +7,12 @@
 
 import email
 from email import Header
+from email.Iterators import typed_subpart_iterator
+from email.iterators import _structure
 import logging
 import re
+
+
 
 class Msg(object):
 
@@ -62,6 +66,63 @@ class Msg(object):
         headers = self.msg.get_all(header_name)
 
         if headers:
-            return (self._trim_line(h) for h in headers)
+            return '\n'.join([self._trim_line(h) for h in headers])
         else:
             return ""
+
+    def get_content_type(self, msg=None):
+        if not msg:
+            msg = self.msg
+        ret = []
+        ret.append(msg.get_content_type())
+
+        if msg.is_multipart():
+            for subpart in msg.get_payload():
+                ret.append(self.get_content_type(subpart))
+
+        return ret
+
+
+    def get_body(self, format=""):
+        'when the body is of multipart, the `format` is applicable.'
+        'format = plain, text only'
+        'format = html, html only'
+        'if no format specified, return both.'
+
+        def _decode_msg(msg):
+            'decode one part of a msg'
+            if msg:
+                return unicode(
+                    msg.get_payload(decode=True),
+                    msg.get_content_charset(),
+                    'replace'
+                    ).strip().encode('utf-8')
+            else:
+                return ""
+
+        if self.msg.is_multipart():
+            parts = typed_subpart_iterator(self.msg, 'text')
+            if parts:
+                return '\n'.join([_decode_msg(p) for p in parts])
+            return ""
+
+        else:
+            body = unicode(self.msg.get_payload(decode=True),
+                           get_charset(self.msg), "replace")
+            return body.strip().encode('utf-8')
+
+    def get_body_len(self):
+        return len(self.get_body())
+
+    def get_stucture(self):
+        'print to stdout.'
+        _structure(self.msg)
+
+
+if __name__ == '__main__':
+    import sys
+    for i in sys.argv[1:]:
+        msg = Msg(file=i)
+        print 'sub, charset,:', msg.get_header('subject')
+        print msg.get_content_type()
+        print 'bodylen', msg.get_body_len()

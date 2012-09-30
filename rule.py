@@ -57,7 +57,7 @@ class RuleBase(object):
         for k in self.get_fields():
             setattr(self, k, kwargs.get(k))
 
-    def if_match(self, msg):
+    def is_match(self, msg):
         return NotImplemented
 
     def __repr__(self):
@@ -76,7 +76,7 @@ class Header(RuleBase):
     def get_fields(self):
         return ['name', 'header_name', 'regex', 'rule_type']
 
-    def if_match(self, msg):
+    def is_match(self, msg):
         header = msg.get_header(self.header_name)
         if header:
             for i in header:
@@ -97,36 +97,41 @@ class Meta(RuleBase):
         rk = ReservedKeywords()
         expr = rk.escape(self.expr)
         regex = re.compile(r'\b(\w+_\w+\b)')
-        expr = regex.sub(r'''%(ruleman)s.get_rule("\1").if_match(%(msg)s)''', expr)
+        expr = regex.sub(r'''%(ruleman)s.get_rule("\1").is_match(%(msg)s)''', expr)
         expr = rk.unescape(expr)
 
         return expr
 
-    def if_match(self, msg):
+    def is_match(self, msg):
         return self.gen_rule(msg)
 
 class RuleManager(object):
 
-    def __init__(self):
-        self.rules = {}
+    def __init__(self, path=None):
 
-    def register(self, **kwargs):
-        mapper = {
+        self.mapper = {
             'header': Header,
             'meta': Meta,
             }
+        self.type_str = 'rule_type'
+        self.ext = '*.cf'
+        self.white_spaces = re.compile(r'\s+')
+        self.load_cfs()
+
+    def register(self, **kwargs):
+        mapper = self.mapper
         name = kwargs.get('name')
         if self.get_rule(name):
             logging.error('dup Rule: %s' % name)
             return
-        rule_type = kwargs.get('rule_type')
+        rule_type = kwargs.get(self.type_str)
         rule = mapper[rule_type](**kwargs)
         self.rules[name] = rule
         return True
 
     def load_one_cf(self, fn):
         lines = open(fn, 'r').readlines()
-        white_spaces = re.compile(r'\s+')
+        white_spaces = self.white_spaces
         if not lines:
             return
 
@@ -137,43 +142,49 @@ class RuleManager(object):
                     if not line.startswith('#'):
                         return line
 
-        #there might be empty line within
         lines = (_trim(i) for i in lines)
         for i in lines:
             if not i:
                 continue
-            kw = {}
             rule_type, name, rule = white_spaces.split(i, 2)
             rule_type = rule_type.lower()
-            kw['rule_type'] = rule_type
-            kw['name'] = name
+            if rule_type not in self.mapper.keys():
+                continue
+            self._core_reg(rule_type, name, rule)
 
-            if rule_type == 'header':
-                h, r = white_spaces.split(rule, 1)
-                kw['header_name'] = h
-                kw['regex'] = r
-            elif rule_type == 'meta':
-                kw['expr'] = rule
+    def _core_reg(self, rule_type, name, rule):
+
+        kw = {}
+        kw[self.type_str] = rule_type
+        kw['name'] = name
+
+        if rule_type == 'header':
+            h, r = self.white_spaces.split(rule, 1)
+            kw['header_name'] = h
+            kw['regex'] = r
+        elif rule_type == 'meta':
+            kw['expr'] = rule
 
             self.register(**kw)
 
     def load_cfs(self, path=None):
         from glob import glob
+        self.rules = {}
         if not path:
             path='./conf'
-        filenames = glob('%s/*.cf' % path)
+        filenames = glob('%s/%s' % (path, self.ext))
         for fn in filenames:
             self.load_one_cf(fn)
 
     def get_rule(self, name):
         return self.rules.get(name, None)
 
-    def if_match(self, msg, rule_name):
+    def is_match(self, msg, rule_name):
         rule = self.get_rule(rule_name)
         if rule.rule_type == 'header':
-            return rule.if_match(msg)
+            return rule.is_match(msg)
         else:
-            template = rule.if_match(msg)
+            template = rule.is_match(msg)
             raw = template % ({
                 'ruleman': 'self',
                 'msg': 'msg',
