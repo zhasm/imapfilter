@@ -7,7 +7,7 @@
 
 from imapclient import IMAPClient
 from settings import HOST, USERNAME, PASSWORD, ssl
-from settings import debug, imap_acct
+from settings import debug, imap_acct, default_not_matched_dest
 from msg import Msg
 from time import sleep
 from threading import Thread
@@ -27,8 +27,21 @@ class IMAP(Thread):
         self.messages = []
         self.filterman = filman
         self.counter = 0
+        self.check_dests()
+
         self.loop()
-        exit()
+
+    def check_dests(self):
+        dests = self.filterman.get_dests()
+        for d in dests:
+            if not self.imap.folder_exists(d):
+                self.imap.create_folder(d)
+                logging.info('[create folder] %s' % d)
+
+        if not self.imap.folder_exists(default_not_matched_dest):
+            self.imap.create_folder(default_not_matched_dest)
+            logging.info('[create folder] %s' % default_not_matched_dest)
+
     def mark_as_unread(self, msg):
         return self.imap.remove_flags(msgs, ('\\SEEN'))
 
@@ -54,15 +67,25 @@ class IMAP(Thread):
         logging.info('enter loop %d' % self.counter)
         self.counter += 1
         self.check()
-        if not self.messages:
-            return
 
-        response = server.fetch(self.messages, ['RFC822'])
+        while self.messages:
+            self._dozen()
+
+        self.imap.close_folder()
+
+    def _dozen(self):
+        if self.messages:
+            msgs = self.messages[:12]
+            self.messages = self.messages[12:]
+        else:
+            return
+        logging.info('processing the first %d msgs; left %d...' % (len(msgs), len(self.messages)))
+        logging.info(msgs)
+        response = self.imap.fetch(msgs, ['RFC822'])
         msgs = [(msgid, Msg(string=data['RFC822']))
                 for (msgid, data) in response.iteritems()]
 
-        self.filterman.test_match_and_take_action(server, msgs)
-        exit()
+        self.filterman.test_match_and_take_action(self.imap, msgs)
 
     def run(self):
         count = 0
@@ -70,9 +93,9 @@ class IMAP(Thread):
             count += 1
             logging.info('idle counter: %d' % count)
             self.idle() or self.loop()
-
+#            self.imap.noop() or self.loop()
             sleep(10)
-            if not count % 10:  # do loop every 10 runs.
+            if not count % 5:  # do loop every 10 runs.
                 self.loop()
 
 

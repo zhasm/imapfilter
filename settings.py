@@ -1,3 +1,5 @@
+default_not_matched_dest = 'NoWhere'
+
 HOST = ''
 USERNAME = ''
 PASSWORD = ''

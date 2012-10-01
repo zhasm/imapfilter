@@ -8,6 +8,7 @@
 from rule import RuleManager, RuleBase
 import logging
 import json
+from settings import default_not_matched_dest
 
 def mark_as_unread(imap, msgs):
     return imap.remove_flags(msgs, ('\\SEEN'))
@@ -43,7 +44,6 @@ class Delete(ActionBase):
         ret.append(imap.expunge())
         return str(ret)
 
-
 class Move(ActionBase):
 
     def do(self, imap, msgs):
@@ -52,9 +52,7 @@ class Move(ActionBase):
         ret.append(imap.copy(msgs, self.dest))
         ret.append(imap.delete_messages(msgs))
         ret.append(imap.expunge())
-
         return str(ret)
-
 
 class FilterManager(RuleManager):
 
@@ -73,6 +71,12 @@ class FilterManager(RuleManager):
         self.ruleman = ruleman
         self.load_cfs(path)
 
+        #add default action
+        self.default = Move(**{
+            'name': '__default',
+            'dest': default_not_matched_dest,
+            })
+
     def _core_reg(self, rule_type, name, rule):
         white_spaces = self.white_spaces
         kw = {}
@@ -82,6 +86,9 @@ class FilterManager(RuleManager):
 
         self.register(**kw)
 
+    def get_dests(self):
+        return (self.rules[i].dest for i in self.rules)
+
     def test_match_and_take_action(self, imap, msgs):
         'msgs is list of {id, msg} dicts'
 
@@ -90,13 +97,22 @@ class FilterManager(RuleManager):
             subject = msg.get_header('subject')
             for rule in self.rules.values():
                 if mid not in matched and self.ruleman.is_match(msg, rule.rule_name):
-                    logging.warning('rule %s is matching msg: %s' %\
+                    logging.warning('filter %s is matching msg: %s' %\
                                     (rule.name, subject))
+                    matched.append(mid)
                     try:
                         ret = rule.do(imap, mid)
                         logging.info(ret)
                         break
                     except Exception as e:
                         logging.error(e)
-
+                # else:
+                #     logging.error('filter %s not match msg %s' % (rule.name, subject))
             mark_as_unread(imap, mid)
+            if mid not in matched:
+                logging.error('[NOT matched by any filter]')
+                logging.info('msg details:\n %s' % msg.get_all_headers(True))
+                self.default.do(imap, mid)
+                logging.info('msg moved to %s' % default_not_matched_dest)
+
+

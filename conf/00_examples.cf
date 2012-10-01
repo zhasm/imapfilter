@@ -1,5 +1,5 @@
 #todo adding 'eval' rule
-
+# `or `must be within ()
 header __has_subject Subject  .
 header __has_from    From  .
 header __has_msg_id  Message-ID  .
@@ -16,28 +16,46 @@ meta from_jp_to_dot_com from_JP and to_dot_com
 
 #any alert
 header f_any_alert from anyalert
+meta m_any_alert f_any_alert and not s_sms_alert
 #action action_name rule        action dest
 header f_sophos from \@sophos\.com
 header t_sophos to \@sophos\.com
 
-meta m_sophos f_sophos or t_sophos
+meta m_sophos (f_sophos or t_sophos)
 
 header _sub_shift_report Subject ^Shift-Report\b
 #STBU China <stbu-toc-china@cisco.com>
-header _to_stbu To stbu-toc(?:-china)?\@cisco\.com
-meta shift_report _sub_shift_report and _to_stbu
+header _to_stbu To \bstbu\b
+header _cc_stbu cc \bstbu\b
+meta   to_or_cc_stbu (_to_stbu or _cc_stbu)
+meta shift_report _sub_shift_report and to_or_cc_stbu
 
 header _f_vtest From vtest@av-test.de
 
 header s_ruleid subject RuleID\d+
 header s_virus subject \[Virus\]
 meta   m_virus s_virus and s_ruleid
-meta   m_ruleid s_ruleid and _to_stbu and not s_virus
+meta   m_ruleid s_ruleid and to_or_cc_stbu and not (s_virus or m_sophos)
 
-header s_reminder subject ^(?i)(?:re)?Reminder:
+header s_2bd subject needs to be revoked
+header s_rmd subject (?i)\breminder\b
+meta m_reminder s_2bd and s_rmd
 
 header s_sms_alert subject SMS Alert
 
 header s_obt subject OUTBREAKTEST
 
-header f_mga from alert@mga.toclab.com
+header f_mga from (?i)IronPort C\d+ Alert
+
+eval e_has_image has_image()
+
+header s_dipin Subject (?i)dip\w* in
+header s_spike Subject (?i)spike
+meta m_fyi e_has_image and to_or_cc_stbu and (s_dipin or s_spike)
+
+header s_ticket subject \[IronPort\.com \#\d+\]
+
+header f_threat_expert from info@threatexpert.com
+involved i_sonata \@sonataservices\.com
+
+body body_cronjob_for_rule IP_REX_\w+

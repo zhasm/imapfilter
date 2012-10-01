@@ -46,8 +46,8 @@ class RuleBase(object):
             return False
         if len(name) < 3:
             return False
-        regex = re.compile(r'^\w+_\w+$')
-        return True if regex.search(name) else False
+        regex = re.compile(r'^\w+[a-zA-Z]\w+$')
+        return bool(regex.match(name))
 
     def __init__(self, **kwargs):
         'rule name check: \w+'
@@ -69,43 +69,64 @@ class RuleBase(object):
             ret[k] = v
         return json.dumps(ret)
 
-
 class Header(RuleBase):
 
     def __init__(self, **kwargs):
         super(Header, self).__init__(**kwargs)
+        setattr(self, 'raw_regex', self.regex)
         self.regex = re.compile(r"(?m)%s" % self.regex)
 
     def get_fields(self):
-        return ['name', 'header_name', 'regex', 'rule_type']
+        return ['name', 'header_name', 'regex', 'rule_type', 'raw_regex']
 
     def is_match(self, msg):
         header = msg.get_header(self.header_name)
-        return True if self.regex.search(header) else False
+        return bool(self.regex.search(header))
+
+class Matcher(Header):
+    def get_fields(self):
+        return ['name', 'header_name', 'regex', 'rule_type', 'raw_regex', 'match_func']
+
+    def is_match(self, msg):
+        func = getattr(msg, self.match_func)
+        field = func()
+        return bool(self.regex.search(field))
+
 
 class Meta(RuleBase):
 
     def __init__(self, **kwargs):
         super(Meta, self).__init__(**kwargs)
-        self.gen = self.gen_rule('msg')
+        self.gen = self.gen_rule()
 
     def get_fields(self):
         return ['name', 'expr', 'rule_type', 'gen']
 
-    def gen_rule(self, msg):
+    def gen_rule(self):
 
         rk = ReservedKeywords()
         expr = rk.escape(self.expr)
         regex = re.compile(r'\b(\w+_\w+\b)')
         expr = regex.sub(
-            r'''%(ruleman)s.get_rule("\1").is_match(%(msg)s)''', expr)
+            r'''( %(ruleman)s.get_rule("\1").is_match(%(msg)s) )''', expr)
         expr = rk.unescape(expr)
         self.gen = expr
         return expr
 
     def is_match(self, msg):
-        return self.gen_rule(msg)
+        return self.gen_rule()
 
+class Eval(Meta):
+
+    def gen_rule(self):
+        return '''%%(msg)s.%s''' % self.expr
+
+    def is_match(self, msg):
+        rule = self.gen_rule() % {'msg': 'msg'}
+        result = eval(rule)
+        logging.info('eval rule: %s; rule def: %s;  result: %r ' % \
+                     (self.name, rule, result))
+        return result
 
 class RuleManager(object):
 
@@ -114,7 +135,12 @@ class RuleManager(object):
         self.mapper = {
             'header': Header,
             'meta': Meta,
+            'eval': Eval,
+            'matcher': Matcher,
         }
+
+        self.matcher=['to_all', 'involved', 'all_headers', 'content_type', 'body']
+
         self.type_str = 'rule_type'
         self.ext = '*.cf'
         self.white_spaces = re.compile(r'\s+')
@@ -133,6 +159,7 @@ class RuleManager(object):
     def load_one_cf(self, fn):
         lines = open(fn, 'r').readlines()
         white_spaces = self.white_spaces
+        all_fields = self.mapper.keys() + self.matcher
         if not lines:
             return
 
@@ -147,9 +174,14 @@ class RuleManager(object):
         for i in lines:
             if not i:
                 continue
-            rule_type, name, rule = white_spaces.split(i, 2)
+            try:
+                rule_type, name, rule = white_spaces.split(i, 2)
+            except Exception as e:
+                logging.error(e)
+                print i
+
             rule_type = rule_type.lower()
-            if rule_type not in self.mapper.keys():
+            if rule_type not in all_fields:
                 continue
             self._core_reg(rule_type, name, rule)
 
@@ -163,8 +195,12 @@ class RuleManager(object):
             h, r = self.white_spaces.split(rule, 1)
             kw['header_name'] = h
             kw['regex'] = r
-        elif rule_type == 'meta':
+        elif rule_type in ['meta', 'eval']:
             kw['expr'] = rule
+        elif rule_type in self.matcher:
+            kw['rule_type'] = 'matcher'
+            kw['match_func'] = 'get_%s' % rule_type
+            kw['regex'] = rule
 
         self.register(**kw)
 
@@ -183,7 +219,7 @@ class RuleManager(object):
     def is_match(self, msg, rule_name):
         rule = self.get_rule(rule_name)
 
-        if rule.rule_type == 'header':
+        if rule.rule_type != 'meta':
             return rule.is_match(msg)
         else:
             template = rule.is_match(msg)
@@ -192,7 +228,9 @@ class RuleManager(object):
                 'msg': 'msg',
             })
             try:
-                logging.info('meta rule %s generated: %r' % (rule_name, raw))
-                return eval(raw)
+                result = eval(raw)
+                # logging.info('meta rule %s generated: %r, result: %r' % (rule_name, raw, result))
+                return bool(result)
             except Exception as e:
                 logging.error(e)
+                return False

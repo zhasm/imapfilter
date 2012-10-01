@@ -32,7 +32,7 @@ class Msg(object):
         elif 'string'in kwargs:
             string = kwargs.get('string')
             self.msg = email.message_from_string(string)
-            logging.info('got email from string')
+            # logging.info('got email from string')
         else:
             logging.error('can not parse email from either string or file.')
 
@@ -65,9 +65,26 @@ class Msg(object):
         headers = self.msg.get_all(header_name)
 
         if headers:
-            return '\n'.join([self._trim_line(h) for h in headers])
+            return '\n'.join((self._trim_line(h) for h in headers))
         else:
             return ""
+
+    def _get_headers(self, *headers):
+        return '\n'.join((self.get_header(i) for i in headers))
+
+    def get_to_all(self):
+        return self._get_headers(*('to', 'cc'))
+
+    def get_involved(self):
+        return self._get_headers(*('from', 'to', 'cc'))
+
+    def get_all_headers(self, with_header_name=False):
+
+        headers = ['subject', 'from', 'to', 'message-id']
+        if not with_header_name:
+            return '\n'.join([self.get_header(h) for h in headers])
+        else:
+            return '\n'.join(['%s: %s' %(h.title(), self.get_header(h)) for h in headers])
 
     def get_content_type(self, msg=None):
         if not msg:
@@ -92,7 +109,7 @@ class Msg(object):
             if msg:
                 return unicode(
                     msg.get_payload(decode=True),
-                    msg.get_content_charset(),
+                    msg.get_content_charset() or 'utf-8',
                     'replace'
                 ).strip().encode('utf-8')
             else:
@@ -106,7 +123,7 @@ class Msg(object):
 
         else:
             body = unicode(self.msg.get_payload(decode=True),
-                           get_charset(self.msg), "replace")
+                           self.msg.get_content_charset() or 'utf-8', "replace")
             return body.strip().encode('utf-8')
 
     def get_body_len(self):
@@ -118,7 +135,7 @@ class Msg(object):
 
     def has_image(self, msg=None):
         ret = str(self.get_content_type())
-        return ret.count('image/')
+        return True if ret.count('image/') else False
 
 
 if __name__ == '__main__':
@@ -129,3 +146,5 @@ if __name__ == '__main__':
         msg.get_stucture()
         print msg.get_content_type()
         print 'any images?', msg.has_image(), msg.get_content_type()
+        print 'involved', msg.get_involved()
+        print 'to_all', msg.get_to_all()
