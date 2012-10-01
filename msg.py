@@ -46,6 +46,7 @@ class Msg(object):
             try:
                 return text.strip().decode(coding).encode('utf-8')
             except Exception as e:
+                logging.error(e)
                 return text
 
         if result:
@@ -84,7 +85,7 @@ class Msg(object):
         if not with_header_name:
             return '\n'.join([self.get_header(h) for h in headers])
         else:
-            return '\n'.join(['%s: %s' %(h.title(), self.get_header(h)) for h in headers])
+            return '\n'.join(['%s: %s' % (h.title(), self.get_header(h)) for h in headers])
 
     def get_content_type(self, msg=None):
         if not msg:

@@ -12,7 +12,7 @@ from msg import Msg
 from time import sleep
 from threading import Thread
 
-from tornado.options import parse_command_line
+from options import parse_command_line
 
 from rule import RuleManager
 from filter import FilterManager
@@ -42,7 +42,7 @@ class IMAP(Thread):
             self.imap.create_folder(default_not_matched_dest)
             logging.info('[create folder] %s' % default_not_matched_dest)
 
-    def mark_as_unread(self, msg):
+    def mark_as_unread(self, msgs):
         return self.imap.remove_flags(msgs, ('\\SEEN'))
 
     def check(self):
@@ -63,7 +63,6 @@ class IMAP(Thread):
         return not responses
 
     def loop(self):
-        server = self.imap
         logging.info('enter loop %d' % self.counter)
         self.counter += 1
         self.check()
@@ -79,7 +78,8 @@ class IMAP(Thread):
             self.messages = self.messages[12:]
         else:
             return
-        logging.info('processing the first %d msgs; left %d...' % (len(msgs), len(self.messages)))
+        logging.info('processing the first %d msgs; left %d...' % (
+            len(msgs), len(self.messages)))
         logging.info(msgs)
         response = self.imap.fetch(msgs, ['RFC822'])
         msgs = [(msgid, Msg(string=data['RFC822']))
@@ -93,7 +93,6 @@ class IMAP(Thread):
             count += 1
             logging.info('idle counter: %d' % count)
             self.idle() or self.loop()
-#            self.imap.noop() or self.loop()
             sleep(10)
             if not count % 5:  # do loop every 10 runs.
                 self.loop()

@@ -10,8 +10,10 @@ import logging
 import json
 from settings import default_not_matched_dest
 
+
 def mark_as_unread(imap, msgs):
     return imap.remove_flags(msgs, ('\\SEEN'))
+
 
 class ActionBase(RuleBase):
     '''{
@@ -44,6 +46,7 @@ class Delete(ActionBase):
         ret.append(imap.expunge())
         return str(ret)
 
+
 class Move(ActionBase):
 
     def do(self, imap, msgs):
@@ -53,6 +56,7 @@ class Move(ActionBase):
         ret.append(imap.delete_messages(msgs))
         ret.append(imap.expunge())
         return str(ret)
+
 
 class FilterManager(RuleManager):
 
@@ -75,10 +79,9 @@ class FilterManager(RuleManager):
         self.default = Move(**{
             'name': '__default',
             'dest': default_not_matched_dest,
-            })
+        })
 
     def _core_reg(self, rule_type, name, rule):
-        white_spaces = self.white_spaces
         kw = {}
         kw[self.type_str] = rule_type
         kw['rule_name'] = kw['name'] = name
@@ -97,7 +100,7 @@ class FilterManager(RuleManager):
             subject = msg.get_header('subject')
             for rule in self.rules.values():
                 if mid not in matched and self.ruleman.is_match(msg, rule.rule_name):
-                    logging.warning('filter %s is matching msg: %s' %\
+                    logging.warning('filter %s is matching msg: %s' %
                                     (rule.name, subject))
                     matched.append(mid)
                     try:
@@ -114,5 +117,3 @@ class FilterManager(RuleManager):
                 logging.info('msg details:\n %s' % msg.get_all_headers(True))
                 self.default.do(imap, mid)
                 logging.info('msg moved to %s' % default_not_matched_dest)
-
-

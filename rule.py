@@ -69,6 +69,7 @@ class RuleBase(object):
             ret[k] = v
         return json.dumps(ret)
 
+
 class Header(RuleBase):
 
     def __init__(self, **kwargs):
@@ -82,6 +83,7 @@ class Header(RuleBase):
     def is_match(self, msg):
         header = msg.get_header(self.header_name)
         return bool(self.regex.search(header))
+
 
 class Matcher(Header):
     def get_fields(self):
@@ -116,6 +118,7 @@ class Meta(RuleBase):
     def is_match(self, msg):
         return self.gen_rule()
 
+
 class Eval(Meta):
 
     def gen_rule(self):
@@ -124,9 +127,10 @@ class Eval(Meta):
     def is_match(self, msg):
         rule = self.gen_rule() % {'msg': 'msg'}
         result = eval(rule)
-        logging.info('eval rule: %s; rule def: %s;  result: %r ' % \
+        logging.info('eval rule: %s; rule def: %s;  result: %r ' %
                      (self.name, rule, result))
         return result
+
 
 class RuleManager(object):
 
@@ -139,7 +143,8 @@ class RuleManager(object):
             'matcher': Matcher,
         }
 
-        self.matcher=['to_all', 'involved', 'all_headers', 'content_type', 'body']
+        self.matcher = ['to_all', 'involved', 'all_headers',
+                        'content_type', 'body']
 
         self.type_str = 'rule_type'
         self.ext = '*.cf'
@@ -164,7 +169,8 @@ class RuleManager(object):
             return
 
         def _trim(line):
-            if not line: return ''
+            if not line:
+                return ''
             line = line.strip()
             if not line.startswith('#'):
                 return line
