@@ -12,8 +12,6 @@ from msg import Msg
 from time import sleep
 from threading import Thread
 
-from options import parse_command_line
-
 from rule import RuleManager
 from filter import FilterManager
 import logging
@@ -96,22 +94,3 @@ class IMAP(Thread):
             sleep(10)
             if not count % 5:  # do loop every 10 runs.
                 self.loop()
-
-
-def set_timezone(zone='Asia/Shanghai'):
-    import os
-    import time
-    os.environ['TZ'] = zone
-    time.tzset()
-
-if __name__ == '__main__':
-    set_timezone()
-    parse_command_line()
-
-    ruleman = RuleManager()
-    ruleman.load_cfs()
-    filman = FilterManager(ruleman=ruleman)
-    i = IMAP(filman=filman)
-
-    i.start()
-    i.join()

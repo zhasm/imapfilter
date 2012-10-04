@@ -26,3 +26,5 @@ pip-log.txt
 sdist
 var
 *.mo
+local_*.cf
+local_*.conf

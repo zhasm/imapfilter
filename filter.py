@@ -9,11 +9,11 @@ from rule import RuleManager, RuleBase
 import logging
 import json
 from settings import default_not_matched_dest
-
+import threading
+from threading import Lock
 
 def mark_as_unread(imap, msgs):
     return imap.remove_flags(msgs, ('\\SEEN'))
-
 
 class ActionBase(RuleBase):
     '''{
@@ -32,6 +32,7 @@ class ActionBase(RuleBase):
 class Copy(ActionBase):
     'msg here is msg id'
     def do(self, imap, msgs):
+
         ret = []
         ret.append(imap.copy(msgs, self.dest))
         ret.append(mark_as_unread(imap, msgs))
@@ -41,6 +42,7 @@ class Copy(ActionBase):
 class Delete(ActionBase):
 
     def do(self, imap, msgs):
+
         ret = []
         ret.append(imap.delete_messages(msgs))
         ret.append(imap.expunge())
@@ -50,6 +52,7 @@ class Delete(ActionBase):
 class Move(ActionBase):
 
     def do(self, imap, msgs):
+
         ret = []
         ret.append(mark_as_unread(imap, msgs))
         ret.append(imap.copy(msgs, self.dest))
@@ -95,25 +98,28 @@ class FilterManager(RuleManager):
     def test_match_and_take_action(self, imap, msgs):
         'msgs is list of {id, msg} dicts'
 
-        matched = []
         for (mid, msg) in msgs:
-            subject = msg.get_header('subject')
-            for rule in self.rules.values():
-                if mid not in matched and self.ruleman.is_match(msg, rule.rule_name):
-                    logging.warning('filter %s is matching msg: %s' %
-                                    (rule.name, subject))
-                    matched.append(mid)
-                    try:
-                        ret = rule.do(imap, mid)
-                        logging.info(ret)
-                        break
-                    except Exception as e:
-                        logging.error(e)
-                # else:
-                #     logging.error('filter %s not match msg %s' % (rule.name, subject))
-            mark_as_unread(imap, mid)
-            if mid not in matched:
-                logging.error('[NOT matched by any filter]')
-                logging.info('msg details:\n %s' % msg.get_all_headers(True))
-                self.default.do(imap, mid)
-                logging.info('msg moved to %s' % default_not_matched_dest)
+            self.process_one_msg(imap, msg, mid)
+
+    def process_one_msg(self, imap, msg, mid):
+        flag_matched = False
+        subject = msg.get_header('subject')
+        for rule in self.rules.values():
+            if self.ruleman.is_match(msg, rule.rule_name):
+                logging.warning('filter %s is matching msg: %s' %
+                                (rule.name, subject))
+                flag_matched = True
+                try:
+                    ret = rule.do(imap, mid)
+                    logging.info(ret)
+                    break
+                except Exception as e:
+                    logging.error(e)
+
+        mark_as_unread(imap, mid)
+
+        if not flag_matched:
+            logging.error('[NOT matched by any filter]')
+            logging.info('msg details:\n %s' % msg.get_all_headers(True))
+            self.default.do(imap, mid)
+            logging.info('msg moved to %s' % default_not_matched_dest)
