@@ -70,7 +70,7 @@ delete    | _rule_name_ | N/A
 
 * 规则定义在 `conf/filter.conf` 文件里。
 * 此处的 _rule_name_ 即上面定义过的rule_name，可以是任意类型的规则，例如header, body, meta, eval, …。
-* 如果规则名称不存在对应的定义，则报错（TODO: 事先检测）。
+* 如果规则名称不存在对应的定义，则报错.
 * 对于 move, copy动作，程序会在启动时遍历所有的目的地文件夹。如果不存在，则主动创建之。文件支持嵌套。
 * 如果任何过滤器都无法匹配某新邮件，则该邮件会被移动到默认文件夹。（定义在settings.py 里的default_not_matched_dest 选项，默认值为 `NoWhere`）。
 
